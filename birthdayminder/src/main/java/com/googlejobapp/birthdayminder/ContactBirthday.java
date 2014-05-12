@@ -85,6 +85,17 @@ public class ContactBirthday {
 		return years;
 	}
 
+    public String getNextBirthdayAgeFormatted() {
+        final Integer age = getNextBirthdayAge();
+        String contactAge;
+        if (age == null) {
+            contactAge = "-";
+        } else {
+            contactAge = age.toString();
+        }
+        return contactAge;
+    }
+
 	public int getDaysAway() {
 		final long now = System.currentTimeMillis();
 		final long birthday = getNextBirthday();
