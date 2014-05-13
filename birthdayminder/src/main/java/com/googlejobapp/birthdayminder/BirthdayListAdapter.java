@@ -57,6 +57,11 @@ public class BirthdayListAdapter extends CursorAdapter {
         mResolver = context.getContentResolver();
     }
 
+    protected static CursorLoader createCursorLoader(Context context) {
+        return new CursorLoader(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
+                SELECTION, SELECTION_ARGS, null);
+    }
+
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
         final View view = mInflater.inflate(R.layout.contact_row, parent, false);
@@ -69,7 +74,6 @@ public class BirthdayListAdapter extends CursorAdapter {
         view.setTag(row);
         return view;
     }
-
 
     @Override
     public void bindView(final View view, final Context context,
@@ -84,14 +88,18 @@ public class BirthdayListAdapter extends CursorAdapter {
 
         String contactAge = birthday.getNextBirthdayAgeFormatted();
 
-
         long id = cursor.getLong(INDEX_CONTACT_ID);
         String lookup = cursor.getString(INDEX_LOOKUP_KEY);
         Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
         String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
 
         row.qcBadge.assignContactUri(uri);
-        row.qcBadge.setImageBitmap(loadContactPhotoThumbnail(thumbUri));
+        final Bitmap imageBitmap = loadContactPhotoThumbnail(thumbUri);
+        if (imageBitmap == null) {
+            row.qcBadge.setImageToDefault();
+        } else {
+            row.qcBadge.setImageBitmap(imageBitmap);
+        }
 
         row.tvName.setText(cursor.getString(INDEX_CONTACT_NAME));
         row.tvDays.setText(daysAway);
@@ -100,77 +108,33 @@ public class BirthdayListAdapter extends CursorAdapter {
     }
 
     /**
-     * Load a contact photo thumbnail and return it as a Bitmap,
-     * resizing the image to the provided image dimensions as needed.
-     *
-     * @param photoData photo ID Prior to Honeycomb, the contact's _ID value.
-     *                  For Honeycomb and later, the value of PHOTO_THUMBNAIL_URI.
-     * @return A thumbnail Bitmap, sized to the provided width and height.
-     * Returns null if the thumbnail is not found.
+     * This method was copied from the Android.com training on QuickContactBadge, but unfortunately
+     * it didn't work.  With the help of the internets, this version should function as expected.
      */
     private Bitmap loadContactPhotoThumbnail(String photoData) {
         if (photoData == null) {
-            Log.d(TAG, "photoData is null");
             return null;
         }
-        Log.d(TAG, "photoData is cool");
-        // Creates an asset file descriptor for the thumbnail file.
-        AssetFileDescriptor afd = null;
+
         InputStream is = null;
-        // try-catch block for file not found
         try {
-            // Creates a holder for the URI.
             Uri thumbUri = Uri.parse(photoData);
-
-
-        /*
-         * Retrieves an AssetFileDescriptor object for the thumbnail
-         * URI
-         * using ContentResolver.openAssetFileDescriptor
-         */
-            afd = mResolver.openAssetFileDescriptor(thumbUri, "r");
             is = mResolver.openInputStream(thumbUri);
-        /*
-         * Gets a file descriptor from the asset file descriptor.
-         * This object can be used across processes.
-         */
-            FileDescriptor fileDescriptor = afd.getFileDescriptor();
-            // Decode the photo file and return the result as a Bitmap
-            // If the file descriptor is valid
-            if (fileDescriptor == null) {
-                Log.d(TAG, "Bleh, fileDescriptor is null");
-            }
-
             if (is != null) {
                 return BitmapFactory.decodeStream(is);
             }
 
-            if (fileDescriptor != null) {
-                Log.d(TAG, "Decoding bitmap!");
-                return BitmapFactory.decodeFileDescriptor(
-                        fileDescriptor, null, null);
-            }
-            // If the file isn't found
         } catch (FileNotFoundException e) {
-            /*
-             * Handle file not found errors
-             */
-
+            Log.e(TAG, "File not found for photoData=" + photoData);
         } finally {
-            if (afd != null) {
-                try {
-                    afd.close();
-                } catch (IOException e) {
-                }
-            }
             if (is != null) {
                 try {
                     is.close();
                 } catch (IOException e) {
+                    Log.e(TAG, "Can't close the input stream", e);
                 }
             }
         }
-        Log.d(TAG, "I hate this function");
         return null;
     }
 
@@ -180,10 +144,5 @@ public class BirthdayListAdapter extends CursorAdapter {
         TextView tvDays;
         TextView tvDate;
         TextView tvAge;
-    }
-
-    protected static CursorLoader createCursorLoader(Context context) {
-        return new CursorLoader(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
-                SELECTION, SELECTION_ARGS, null);
     }
 }
