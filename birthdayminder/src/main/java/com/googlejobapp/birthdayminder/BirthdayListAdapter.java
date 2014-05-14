@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.CursorLoader;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
+import android.database.CursorWrapper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -22,6 +23,8 @@ import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by joey.tsai on 5/12/2014.
@@ -57,11 +60,6 @@ public class BirthdayListAdapter extends CursorAdapter {
         mResolver = context.getContentResolver();
     }
 
-    protected static CursorLoader createCursorLoader(Context context) {
-        return new CursorLoader(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
-                SELECTION, SELECTION_ARGS, null);
-    }
-
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
         final View view = mInflater.inflate(R.layout.contact_row, parent, false);
@@ -91,10 +89,15 @@ public class BirthdayListAdapter extends CursorAdapter {
         long id = cursor.getLong(INDEX_CONTACT_ID);
         String lookup = cursor.getString(INDEX_LOOKUP_KEY);
         Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
-        String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
+
+        Bitmap imageBitmap = null;
+        if (cursor instanceof BirthdayCursor) {
+            imageBitmap = ((BirthdayCursor) cursor).getContactBitmap();
+        } else {
+            Log.e(TAG, "Cursor is not a BirthdayCursor!");
+        }
 
         row.qcBadge.assignContactUri(uri);
-        final Bitmap imageBitmap = loadContactPhotoThumbnail(thumbUri);
         if (imageBitmap == null) {
             row.qcBadge.setImageToDefault();
         } else {
@@ -107,11 +110,15 @@ public class BirthdayListAdapter extends CursorAdapter {
         row.tvAge.setText(contactAge);
     }
 
-    /**
-     * This method was copied from the Android.com training on QuickContactBadge, but unfortunately
-     * it didn't work.  With the help of the internets, this version should function as expected.
-     */
-    private Bitmap loadContactPhotoThumbnail(String photoData) {
+    private static class ContactRow {
+        QuickContactBadge qcBadge;
+        TextView tvName;
+        TextView tvDays;
+        TextView tvDate;
+        TextView tvAge;
+    }
+
+    private static Bitmap loadContactPhotoThumbnail(ContentResolver resolver, String photoData) {
         if (photoData == null) {
             return null;
         }
@@ -119,7 +126,7 @@ public class BirthdayListAdapter extends CursorAdapter {
         InputStream is = null;
         try {
             Uri thumbUri = Uri.parse(photoData);
-            is = mResolver.openInputStream(thumbUri);
+            is = resolver.openInputStream(thumbUri);
             if (is != null) {
                 return BitmapFactory.decodeStream(is);
             }
@@ -138,11 +145,45 @@ public class BirthdayListAdapter extends CursorAdapter {
         return null;
     }
 
-    private static class ContactRow {
-        QuickContactBadge qcBadge;
-        TextView tvName;
-        TextView tvDays;
-        TextView tvDate;
-        TextView tvAge;
+    protected static BirthdayCursorLoader createCursorLoader(Context context) {
+        return new BirthdayCursorLoader(context);
+    }
+
+    protected static class BirthdayCursorLoader extends CursorLoader {
+        private final ContentResolver mResolver;
+        public BirthdayCursorLoader(Context context) {
+            super(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
+                    SELECTION, SELECTION_ARGS, null);
+            mResolver = context.getContentResolver();
+        }
+
+        @Override
+        public Cursor loadInBackground() {
+            final Cursor cursor = super.loadInBackground();
+            BirthdayCursor birthdayCursor = new BirthdayCursor(cursor);
+            while(cursor.moveToNext()) {
+                birthdayCursor.loadContactBitmap(mResolver);
+            }
+            return birthdayCursor;
+        }
+    }
+
+    protected static class BirthdayCursor extends CursorWrapper {
+        private final Map<String, Bitmap> mBitmaps;
+        public BirthdayCursor(Cursor cursor) {
+            super(cursor);
+            mBitmaps = new HashMap<String, Bitmap>();
+        }
+
+        public void loadContactBitmap(ContentResolver resolver) {
+            String thumbUri = getString(INDEX_THUMBNAIL_URI);
+            final Bitmap imageBitmap = loadContactPhotoThumbnail(resolver, thumbUri);
+            mBitmaps.put(thumbUri, imageBitmap);
+        }
+
+        public Bitmap getContactBitmap() {
+            String thumbUri = getString(INDEX_THUMBNAIL_URI);
+            return mBitmaps.get(thumbUri);
+        }
     }
 }
