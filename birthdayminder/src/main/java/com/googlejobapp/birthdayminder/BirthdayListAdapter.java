@@ -9,6 +9,7 @@ import android.database.CursorWrapper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.provider.ContactsContract;
 import android.text.format.DateUtils;
 import android.util.Log;
@@ -16,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CursorAdapter;
+import android.widget.ImageView;
 import android.widget.QuickContactBadge;
 import android.widget.TextView;
 
@@ -23,6 +25,7 @@ import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -90,19 +93,26 @@ public class BirthdayListAdapter extends CursorAdapter {
         String lookup = cursor.getString(INDEX_LOOKUP_KEY);
         Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
 
-        Bitmap imageBitmap = null;
-        if (cursor instanceof BirthdayCursor) {
-            imageBitmap = ((BirthdayCursor) cursor).getContactBitmap();
-        } else {
-            Log.e(TAG, "Cursor is not a BirthdayCursor!");
+        String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
+        row.qcBadge.setImageToDefault();
+        if (thumbUri != null) {
+            BitmapWorkerTask task = new BitmapWorkerTask(context, row.qcBadge);
+            task.execute(thumbUri);
         }
 
+//        Bitmap imageBitmap = null;
+//        if (cursor instanceof BirthdayCursor) {
+//            imageBitmap = ((BirthdayCursor) cursor).getContactBitmap();
+//        } else {
+//            Log.e(TAG, "Cursor is not a BirthdayCursor!");
+//        }
+
         row.qcBadge.assignContactUri(uri);
-        if (imageBitmap == null) {
-            row.qcBadge.setImageToDefault();
-        } else {
-            row.qcBadge.setImageBitmap(imageBitmap);
-        }
+//        if (imageBitmap == null) {
+//            row.qcBadge.setImageToDefault();
+//        } else {
+//            row.qcBadge.setImageBitmap(imageBitmap);
+//        }
 
         row.tvName.setText(cursor.getString(INDEX_CONTACT_NAME));
         row.tvDays.setText(daysAway);
@@ -145,30 +155,40 @@ public class BirthdayListAdapter extends CursorAdapter {
         return null;
     }
 
-    protected static BirthdayCursorLoader createCursorLoader(Context context) {
-        return new BirthdayCursorLoader(context);
+    protected static CursorLoader createCursorLoader(Context context) {
+        return new CursorLoader(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
+                SELECTION, SELECTION_ARGS, null);
     }
 
-    protected static class BirthdayCursorLoader extends CursorLoader {
+    private class BitmapWorkerTask extends AsyncTask<String, Void, Bitmap> {
+        private final WeakReference<ImageView> imageViewReference;
         private final ContentResolver mResolver;
-        public BirthdayCursorLoader(Context context) {
-            super(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
-                    SELECTION, SELECTION_ARGS, null);
+
+        public BitmapWorkerTask(Context context, ImageView imageView) {
             mResolver = context.getContentResolver();
+            imageViewReference = new WeakReference<ImageView>(imageView);
         }
 
+        // Decode image in background.
         @Override
-        public Cursor loadInBackground() {
-            final Cursor cursor = super.loadInBackground();
-            BirthdayCursor birthdayCursor = new BirthdayCursor(cursor);
-            while(cursor.moveToNext()) {
-                birthdayCursor.loadContactBitmap(mResolver);
+        protected Bitmap doInBackground(String... params) {
+            String uri = params[0];
+            return loadContactPhotoThumbnail(mResolver, uri);
+        }
+
+        // Once complete, see if ImageView is still around and set bitmap.
+        @Override
+        protected void onPostExecute(Bitmap bitmap) {
+            if (imageViewReference != null && bitmap != null) {
+                final ImageView imageView = imageViewReference.get();
+                if (imageView != null) {
+                    imageView.setImageBitmap(bitmap);
+                }
             }
-            return birthdayCursor;
         }
     }
 
-    protected static class BirthdayCursor extends CursorWrapper {
+    private static class BirthdayCursor extends CursorWrapper {
         private final Map<String, Bitmap> mBitmaps;
         public BirthdayCursor(Cursor cursor) {
             super(cursor);
