@@ -3,9 +3,7 @@ package com.googlejobapp.birthdayminder;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.CursorLoader;
-import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
-import android.database.CursorWrapper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -13,6 +11,7 @@ import android.os.AsyncTask;
 import android.provider.ContactsContract;
 import android.text.format.DateUtils;
 import android.util.Log;
+import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,13 +20,12 @@ import android.widget.ImageView;
 import android.widget.QuickContactBadge;
 import android.widget.TextView;
 
-import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created by joey.tsai on 5/12/2014.
@@ -54,13 +52,42 @@ public class BirthdayListAdapter extends CursorAdapter {
     private static final int INDEX_BIRTHDATE = 3;
     private static final int INDEX_THUMBNAIL_URI = 4;
 
-    private LayoutInflater mInflater;
-    private ContentResolver mResolver;
+    private final LayoutInflater mInflater;
+    private final ContentResolver mResolver;
+    private final LruCache<String, Bitmap> mMemoryCache;
+    private final Set<String> mNoAvatar;
 
     public BirthdayListAdapter(Context context) {
         super(context, null, 0);
         mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mResolver = context.getContentResolver();
+
+        // Get max available VM memory, exceeding this amount will throw an
+        // OutOfMemory exception. Stored in kilobytes as LruCache takes an
+        // int in its constructor.
+        final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+
+        // Use 1/8th of the available memory for this memory cache.
+        final int cacheSize = maxMemory / 8;
+
+        mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
+            @Override
+            protected int sizeOf(String key, Bitmap bitmap) {
+                // The cache size will be measured in kilobytes rather than
+                // number of items.
+                return bitmap.getByteCount() / 1024;
+            }
+        };
+
+        mNoAvatar = new HashSet<String>();
+    }
+
+    private void addBitmapToMemoryCache(String key, Bitmap bitmap) {
+        synchronized (mMemoryCache) {
+            if (mMemoryCache.get(key) == null) {
+                mMemoryCache.put(key, bitmap);
+            }
+        }
     }
 
     @Override
@@ -93,26 +120,23 @@ public class BirthdayListAdapter extends CursorAdapter {
         String lookup = cursor.getString(INDEX_LOOKUP_KEY);
         Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
 
+        QuickContactBadge badge = row.qcBadge;
+        badge.assignContactUri(uri);
         String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
-        row.qcBadge.setImageToDefault();
-        if (thumbUri != null) {
-            BitmapWorkerTask task = new BitmapWorkerTask(context, row.qcBadge);
-            task.execute(thumbUri);
+        Bitmap bitmap = null;
+        if (thumbUri != null && !mNoAvatar.contains(thumbUri)) {
+            bitmap = mMemoryCache.get(thumbUri);
+            if (bitmap == null) {
+                BitmapWorkerTask task = new BitmapWorkerTask(row.qcBadge);
+                task.execute(thumbUri);
+            }
         }
 
-//        Bitmap imageBitmap = null;
-//        if (cursor instanceof BirthdayCursor) {
-//            imageBitmap = ((BirthdayCursor) cursor).getContactBitmap();
-//        } else {
-//            Log.e(TAG, "Cursor is not a BirthdayCursor!");
-//        }
-
-        row.qcBadge.assignContactUri(uri);
-//        if (imageBitmap == null) {
-//            row.qcBadge.setImageToDefault();
-//        } else {
-//            row.qcBadge.setImageBitmap(imageBitmap);
-//        }
+        if (bitmap == null) {
+            badge.setImageToDefault();
+        } else {
+            badge.setImageBitmap(bitmap);
+        }
 
         row.tvName.setText(cursor.getString(INDEX_CONTACT_NAME));
         row.tvDays.setText(daysAway);
@@ -162,21 +186,23 @@ public class BirthdayListAdapter extends CursorAdapter {
 
     private class BitmapWorkerTask extends AsyncTask<String, Void, Bitmap> {
         private final WeakReference<ImageView> imageViewReference;
-        private final ContentResolver mResolver;
 
-        public BitmapWorkerTask(Context context, ImageView imageView) {
-            mResolver = context.getContentResolver();
+        public BitmapWorkerTask(ImageView imageView) {
             imageViewReference = new WeakReference<ImageView>(imageView);
         }
 
-        // Decode image in background.
         @Override
         protected Bitmap doInBackground(String... params) {
             String uri = params[0];
-            return loadContactPhotoThumbnail(mResolver, uri);
+            final Bitmap bitmap = loadContactPhotoThumbnail(mResolver, uri);
+            if (bitmap == null) {
+                mNoAvatar.add(uri);
+            } else {
+                addBitmapToMemoryCache(uri, bitmap);
+            }
+            return bitmap;
         }
 
-        // Once complete, see if ImageView is still around and set bitmap.
         @Override
         protected void onPostExecute(Bitmap bitmap) {
             if (imageViewReference != null && bitmap != null) {
@@ -185,25 +211,6 @@ public class BirthdayListAdapter extends CursorAdapter {
                     imageView.setImageBitmap(bitmap);
                 }
             }
-        }
-    }
-
-    private static class BirthdayCursor extends CursorWrapper {
-        private final Map<String, Bitmap> mBitmaps;
-        public BirthdayCursor(Cursor cursor) {
-            super(cursor);
-            mBitmaps = new HashMap<String, Bitmap>();
-        }
-
-        public void loadContactBitmap(ContentResolver resolver) {
-            String thumbUri = getString(INDEX_THUMBNAIL_URI);
-            final Bitmap imageBitmap = loadContactPhotoThumbnail(resolver, thumbUri);
-            mBitmaps.put(thumbUri, imageBitmap);
-        }
-
-        public Bitmap getContactBitmap() {
-            String thumbUri = getString(INDEX_THUMBNAIL_URI);
-            return mBitmaps.get(thumbUri);
         }
     }
 }
