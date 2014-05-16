@@ -24,6 +24,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -54,40 +55,13 @@ public class BirthdayListAdapter extends CursorAdapter {
 
     private final LayoutInflater mInflater;
     private final ContentResolver mResolver;
-    private final LruCache<String, Bitmap> mMemoryCache;
-    private final Set<String> mNoAvatar;
+    private final ContactPhotoCache mPhotoCache;
 
     public BirthdayListAdapter(Context context) {
         super(context, null, 0);
         mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mResolver = context.getContentResolver();
-
-        // Get max available VM memory, exceeding this amount will throw an
-        // OutOfMemory exception. Stored in kilobytes as LruCache takes an
-        // int in its constructor.
-        final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
-
-        // Use 1/8th of the available memory for this memory cache.
-        final int cacheSize = maxMemory / 8;
-
-        mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
-            @Override
-            protected int sizeOf(String key, Bitmap bitmap) {
-                // The cache size will be measured in kilobytes rather than
-                // number of items.
-                return bitmap.getByteCount() / 1024;
-            }
-        };
-
-        mNoAvatar = new HashSet<String>();
-    }
-
-    private void addBitmapToMemoryCache(String key, Bitmap bitmap) {
-        synchronized (mMemoryCache) {
-            if (mMemoryCache.get(key) == null) {
-                mMemoryCache.put(key, bitmap);
-            }
-        }
+        mPhotoCache = new ContactPhotoCache();
     }
 
     @Override
@@ -124,10 +98,11 @@ public class BirthdayListAdapter extends CursorAdapter {
         badge.assignContactUri(uri);
         String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
         Bitmap bitmap = null;
-        if (thumbUri != null && !mNoAvatar.contains(thumbUri)) {
-            bitmap = mMemoryCache.get(thumbUri);
+
+        if (mPhotoCache.fetchContactPhoto(thumbUri)) {
+            bitmap = mPhotoCache.getContactPhoto(thumbUri);
             if (bitmap == null) {
-                BitmapWorkerTask task = new BitmapWorkerTask(row.qcBadge);
+                ContactPhotoTask task = new ContactPhotoTask(badge, mPhotoCache, mResolver);
                 task.execute(thumbUri);
             }
         }
@@ -184,29 +159,75 @@ public class BirthdayListAdapter extends CursorAdapter {
                 SELECTION, SELECTION_ARGS, null);
     }
 
-    private class BitmapWorkerTask extends AsyncTask<String, Void, Bitmap> {
-        private final WeakReference<ImageView> imageViewReference;
+    private static class ContactPhotoCache {
+        private final LruCache<String, Bitmap> mCache;
+        private final Set<String> mHasNoContactPhoto;
 
-        public BitmapWorkerTask(ImageView imageView) {
-            imageViewReference = new WeakReference<ImageView>(imageView);
+        public ContactPhotoCache() {
+            // Get max available VM memory, exceeding this amount will throw an
+            // OutOfMemory exception. Stored in kilobytes as LruCache takes an
+            // int in its constructor.
+            final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+
+            // Use 1/4th of the available memory for this memory cache.
+            final int cacheSize = maxMemory / 4;
+
+            mCache = new LruCache<String, Bitmap>(cacheSize) {
+                @Override
+                protected int sizeOf(String key, Bitmap bitmap) {
+                    // The cache size will be measured in kilobytes rather than
+                    // number of items.
+                    return bitmap.getByteCount() / 1024;
+                }
+            };
+
+            mHasNoContactPhoto = Collections.synchronizedSet(new HashSet<String>());
+        }
+
+        public Bitmap getContactPhoto(String thumbUri) {
+            return mCache.get(thumbUri);
+        }
+
+        public boolean fetchContactPhoto(String thumbUri) {
+            return thumbUri != null && !mHasNoContactPhoto.contains(thumbUri);
+        }
+
+        public void putContactPhoto(String uri, Bitmap bitmap) {
+            if (bitmap == null) {
+                mHasNoContactPhoto.add(uri);
+            } else {
+                synchronized (mCache) {
+                    if (mCache.get(uri) == null) {
+                        mCache.put(uri, bitmap);
+                    }
+                }
+            }
+        }
+    }
+
+    private static class ContactPhotoTask extends AsyncTask<String, Void, Bitmap> {
+        private final WeakReference<ImageView> mImageViewReference;
+        private final ContactPhotoCache mCache;
+        private final ContentResolver mResolver;
+
+        public ContactPhotoTask(ImageView imageView, ContactPhotoCache photoCache, ContentResolver contentResolver) {
+            mImageViewReference = new WeakReference<ImageView>(imageView);
+            mCache = photoCache;
+            mResolver = contentResolver;
         }
 
         @Override
         protected Bitmap doInBackground(String... params) {
             String uri = params[0];
             final Bitmap bitmap = loadContactPhotoThumbnail(mResolver, uri);
-            if (bitmap == null) {
-                mNoAvatar.add(uri);
-            } else {
-                addBitmapToMemoryCache(uri, bitmap);
-            }
+            mCache.putContactPhoto(uri, bitmap);
             return bitmap;
         }
 
         @Override
         protected void onPostExecute(Bitmap bitmap) {
-            if (imageViewReference != null && bitmap != null) {
-                final ImageView imageView = imageViewReference.get();
+            if (mImageViewReference != null && bitmap != null) {
+                final ImageView imageView = mImageViewReference.get();
                 if (imageView != null) {
                     imageView.setImageBitmap(bitmap);
                 }
