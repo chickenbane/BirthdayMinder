@@ -2,7 +2,6 @@ package com.googlejobapp.birthdayminder;
 
 import android.database.Cursor;
 import android.database.CursorWrapper;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Collections;

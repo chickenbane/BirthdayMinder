@@ -47,7 +47,6 @@ public class BirthdayDao {
     }
 
     static private class BirthdayCursorLoader extends CursorLoader {
-
         public BirthdayCursorLoader(Context context) {
             super(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
                     SELECTION, SELECTION_ARGS, null);
