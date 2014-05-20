@@ -31,38 +31,37 @@ import java.util.Set;
 /**
  * Created by joey.tsai on 5/12/2014.
  */
-public class BirthdayListAdapter extends CursorAdapter {
-    private static final String TAG = "BirthdayListAdapter";
-
-    private static final String[] PROJECTION = {
-            ContactsContract.Data._ID, // 0
-            ContactsContract.Data.LOOKUP_KEY,  // 1
-            ContactsContract.Data.DISPLAY_NAME_PRIMARY, // 2
-            ContactsContract.CommonDataKinds.Event.START_DATE, // 3
-            ContactsContract.Contacts.PHOTO_THUMBNAIL_URI, // 4
-    };
-
-    private static final String SELECTION = ContactsContract.Data.MIMETYPE + " = ? AND "
-            + ContactsContract.CommonDataKinds.Event.TYPE + " = ?";
-    private static final String[] SELECTION_ARGS = {ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
-            "" + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY};
-
-    private static final int INDEX_CONTACT_ID = 0;
-    private static final int INDEX_LOOKUP_KEY = 1;
-    private static final int INDEX_CONTACT_NAME = 2;
-    private static final int INDEX_BIRTHDATE = 3;
-    private static final int INDEX_THUMBNAIL_URI = 4;
+public class ContactListAdapter extends CursorAdapter {
+    private static final String TAG = "ContactListAdapter";
 
     private final LayoutInflater mInflater;
     private final ContentResolver mResolver;
     private final ContactPhotoCache mPhotoCache;
 
-    public BirthdayListAdapter(Context context) {
+    public ContactListAdapter(Context context) {
         super(context, null, 0);
         mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mResolver = context.getContentResolver();
         mPhotoCache = new ContactPhotoCache();
     }
+
+    @Override
+    public long getItemId(int position) {
+        final BirthdayCursor cursor = (BirthdayCursor) getCursor();
+        return cursor.getBirthdayListRow(position).getId();
+    }
+
+//    @Override
+//    public View getView(int position, View convertView, ViewGroup parent) {
+//        View v;
+//        if (convertView == null) {
+//            v = newView(mContext, mCursor, parent);
+//        } else {
+//            v = convertView;
+//        }
+//        bindView(v, mContext, mCursor);
+//        return v;
+//    }
 
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
@@ -82,21 +81,18 @@ public class BirthdayListAdapter extends CursorAdapter {
                          final Cursor cursor) {
         ContactRow row = (ContactRow) view.getTag();
 
-        final ContactBirthday birthday = ContactBirthday
-                .createContactBirthday(cursor.getString(INDEX_BIRTHDATE));
+        BirthdayCursor birthdayCursor = (BirthdayCursor) cursor;
+        BirthdayListRow birthdayRow = birthdayCursor.getBirthdayListRow(cursor.getPosition());
+
         final String formattedBirthday = DateUtils.formatDateTime(null,
-                birthday.getNextBirthday(), DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
-        final String daysAway = birthday.getDaysAway() + "d";
+                birthdayRow.getBirthday().getNextBirthday(), DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
+        final String daysAway = birthdayRow.getBirthday().getDaysAway() + "d";
 
-        String contactAge = birthday.getNextBirthdayAgeFormatted();
-
-        long id = cursor.getLong(INDEX_CONTACT_ID);
-        String lookup = cursor.getString(INDEX_LOOKUP_KEY);
-        Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
+        String contactAge = birthdayRow.getBirthday().getNextBirthdayAgeFormatted();
 
         QuickContactBadge badge = row.qcBadge;
-        badge.assignContactUri(uri);
-        String thumbUri = cursor.getString(INDEX_THUMBNAIL_URI);
+        badge.assignContactUri(birthdayRow.getUri());
+        String thumbUri = birthdayRow.getThumbUri();
         Bitmap bitmap = null;
 
         if (mPhotoCache.fetchContactPhoto(thumbUri)) {
@@ -113,7 +109,7 @@ public class BirthdayListAdapter extends CursorAdapter {
             badge.setImageBitmap(bitmap);
         }
 
-        row.tvName.setText(cursor.getString(INDEX_CONTACT_NAME));
+        row.tvName.setText(birthdayRow.getName());
         row.tvDays.setText(daysAway);
         row.tvDate.setText(formattedBirthday);
         row.tvAge.setText(contactAge);
@@ -152,11 +148,6 @@ public class BirthdayListAdapter extends CursorAdapter {
             }
         }
         return null;
-    }
-
-    protected static CursorLoader createCursorLoader(Context context) {
-        return new CursorLoader(context, ContactsContract.Data.CONTENT_URI, PROJECTION,
-                SELECTION, SELECTION_ARGS, null);
     }
 
     private static class ContactPhotoCache {

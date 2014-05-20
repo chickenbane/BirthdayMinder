@@ -27,6 +27,9 @@ public class ContactBirthday {
 	private final boolean mHasYear;
 	private final Date mBirthDate;
 
+    private final long mNextBirthday;
+    private final int mDaysAway;
+
 	public static ContactBirthday createContactBirthday(final String contactDate) {
 		if (contactDate == null) {
 			return null;
@@ -49,22 +52,47 @@ public class ContactBirthday {
 	}
 
 	public ContactBirthday(final boolean hasYear, final Date birthDate) {
-		mHasYear = hasYear;
-		mBirthDate = birthDate;
-	}
+        mHasYear = hasYear;
+        mBirthDate = birthDate;
 
-	public long getNextBirthday() {
-		final Calendar now = Calendar.getInstance();
-		final int thisYear = now.get(Calendar.YEAR);
-		final Calendar birthdate = Calendar.getInstance();
-		birthdate.setTime(mBirthDate);
-		birthdate.set(Calendar.YEAR, thisYear);
+        mNextBirthday = calcNextBirthday(birthDate);
+        mDaysAway = calcDaysAway(mNextBirthday);
+    }
 
-		if (now.after(birthdate)) {
-			birthdate.set(Calendar.YEAR, thisYear + 1);
-		}
-		return birthdate.getTimeInMillis();
-	}
+    public long getNextBirthday() {
+        return mNextBirthday;
+    }
+
+    public int getDaysAway() {
+        return mDaysAway;
+    }
+
+    static private long calcNextBirthday(Date birthDate) {
+        final Calendar now = Calendar.getInstance();
+        final int thisYear = now.get(Calendar.YEAR);
+        final Calendar calendar = Calendar.getInstance();
+        calendar.setTime(birthDate);
+        calendar.set(Calendar.YEAR, thisYear);
+
+        if (now.after(calendar)) {
+            calendar.set(Calendar.YEAR, thisYear + 1);
+        }
+        return calendar.getTimeInMillis();
+    }
+
+    static private int calcDaysAway(long nextBirthday) {
+        final long now = System.currentTimeMillis();
+        final Time nowTime = new Time();
+        nowTime.set(now);
+        final int today = Time.getJulianDay(now, nowTime.gmtoff);
+
+        final Time birthdayTime = new Time();
+        birthdayTime.set(nextBirthday);
+        final int future = Time.getJulianDay(nextBirthday,
+                birthdayTime.gmtoff);
+
+        return future - today;
+    }
 
 	public Integer getNextBirthdayAge() {
 		if (!mHasYear) {
@@ -95,20 +123,4 @@ public class ContactBirthday {
         }
         return contactAge;
     }
-
-	public int getDaysAway() {
-		final long now = System.currentTimeMillis();
-		final long birthday = getNextBirthday();
-
-		final Time nowTime = new Time();
-		nowTime.set(now);
-		final int today = Time.getJulianDay(now, nowTime.gmtoff);
-
-		final Time birthdayTime = new Time();
-		birthdayTime.set(birthday);
-		final int nextBirthday = Time.getJulianDay(birthday,
-				birthdayTime.gmtoff);
-
-		return nextBirthday - today;
-	}
 }

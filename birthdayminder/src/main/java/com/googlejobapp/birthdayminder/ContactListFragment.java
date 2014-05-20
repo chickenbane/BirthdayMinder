@@ -16,13 +16,13 @@ public class ContactListFragment extends ListFragment implements
 	private static final String TAG = "ContactListFragment";
 
 
-	private BirthdayListAdapter mAdapter;
+	private ContactListAdapter mAdapter;
 
 	@Override
 	public void onActivityCreated(final Bundle savedInstanceState) {
 		super.onActivityCreated(savedInstanceState);
 
-		mAdapter = new BirthdayListAdapter(getActivity());
+		mAdapter = new ContactListAdapter(getActivity());
 		setListAdapter(mAdapter);
 
 		getListView().setOnItemClickListener(this);
@@ -32,7 +32,7 @@ public class ContactListFragment extends ListFragment implements
 
 	@Override
 	public Loader<Cursor> onCreateLoader(final int id, final Bundle args) {
-		return BirthdayListAdapter.createCursorLoader(getActivity());
+		return BirthdayDao.createCursorLoader(getActivity());
 	}
 
 	@Override
