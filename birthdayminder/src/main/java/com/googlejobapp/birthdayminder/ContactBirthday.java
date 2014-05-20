@@ -24,11 +24,11 @@ public class ContactBirthday {
 	private static final SimpleDateFormat BIRTHDAY_NO_YEAR_FORMAT = new SimpleDateFormat(
 			"--MM-dd", Locale.US);
 
-	private final boolean mHasYear;
 	private final Date mBirthDate;
 
     protected final long mNextBirthday;
     protected final int mDaysAway;
+    protected final String mNextAge;
 
 	public static ContactBirthday createContactBirthday(final String contactDate) {
 		if (contactDate == null) {
@@ -48,15 +48,14 @@ public class ContactBirthday {
 			return null;
 		}
 
-		return new ContactBirthday(hasYear, birthDate);
+		return new ContactBirthday(birthDate, hasYear);
 	}
 
-	public ContactBirthday(final boolean hasYear, final Date birthDate) {
-        mHasYear = hasYear;
+	public ContactBirthday(final Date birthDate, boolean hasYear) {
         mBirthDate = birthDate;
-
         mNextBirthday = calcNextBirthday(birthDate);
         mDaysAway = calcDaysAway(mNextBirthday);
+        mNextAge = calcNextAge(hasYear, birthDate);
     }
 
     static private long calcNextBirthday(Date birthDate) {
@@ -86,33 +85,24 @@ public class ContactBirthday {
         return future - today;
     }
 
-	public Integer getNextBirthdayAge() {
-		if (!mHasYear) {
-			return null;
-		}
-
-		final Calendar now = Calendar.getInstance();
-		final int thisYear = now.get(Calendar.YEAR);
-		final Calendar birthdate = Calendar.getInstance();
-		birthdate.setTime(mBirthDate);
-		final int birthYear = birthdate.get(Calendar.YEAR);
-		final int years = thisYear - birthYear;
-		birthdate.set(Calendar.YEAR, thisYear);
-
-		if (now.after(birthdate)) {
-			return years + 1;
-		}
-		return years;
-	}
-
-    public String getNextBirthdayAgeFormatted() {
-        final Integer age = getNextBirthdayAge();
-        String contactAge;
-        if (age == null) {
-            contactAge = "-";
-        } else {
-            contactAge = age.toString();
+    static private String calcNextAge(boolean hasYear, Date birthdate) {
+        if (!hasYear) {
+            return "-";
         }
-        return contactAge;
+
+        final Calendar now = Calendar.getInstance();
+        final int thisYear = now.get(Calendar.YEAR);
+        final Calendar calendar = Calendar.getInstance();
+        calendar.setTime(birthdate);
+        final int birthYear = calendar.get(Calendar.YEAR);
+        final int years = thisYear - birthYear;
+        calendar.set(Calendar.YEAR, thisYear);
+        int age;
+        if (now.after(calendar)) {
+            age = years + 1;
+        } else {
+            age = years;
+        }
+        return String.valueOf(age);
     }
 }

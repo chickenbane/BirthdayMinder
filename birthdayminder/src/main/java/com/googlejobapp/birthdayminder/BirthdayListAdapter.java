@@ -89,7 +89,6 @@ public class BirthdayListAdapter extends CursorAdapter {
         final String formattedBirthday = DateUtils.formatDateTime(null,
                 contactBirthday.mNextBirthday, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
         final String daysAway = contactBirthday.mDaysAway + "d";
-        String contactAge = contactBirthday.getNextBirthdayAgeFormatted();
 
         QuickContactBadge badge = hodor.qcBadge;
         badge.assignContactUri(birthdayRow.mUri);
@@ -113,7 +112,7 @@ public class BirthdayListAdapter extends CursorAdapter {
         hodor.tvName.setText(birthdayRow.mName);
         hodor.tvDays.setText(daysAway);
         hodor.tvDate.setText(formattedBirthday);
-        hodor.tvAge.setText(contactAge);
+        hodor.tvAge.setText(contactBirthday.mNextAge);
     }
 
     static private class ViewHolder {
