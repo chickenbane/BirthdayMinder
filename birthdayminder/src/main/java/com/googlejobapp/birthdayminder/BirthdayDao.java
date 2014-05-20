@@ -3,11 +3,8 @@ package com.googlejobapp.birthdayminder;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.provider.ContactsContract;
-import android.text.format.DateUtils;
-import android.widget.QuickContactBadge;
 
 /**
  * Created by joey.tsai on 5/19/2014.
@@ -33,7 +30,7 @@ public class BirthdayDao {
     private static final String[] SELECTION_ARGS = {ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
             "" + ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY};
 
-    static public BirthdayListRow createBirthdayListRow(Cursor cursor) {
+    static public BirthdayContact createBirthdayListRow(Cursor cursor) {
         final ContactBirthday birthday = ContactBirthday
                 .createContactBirthday(cursor.getString(INDEX_BIRTHDATE));
         long id = cursor.getLong(INDEX_CONTACT_ID);
@@ -42,7 +39,7 @@ public class BirthdayDao {
         String name = cursor.getString(INDEX_CONTACT_NAME);
         Uri uri = ContactsContract.Contacts.getLookupUri(id, lookup);
 
-        return new BirthdayListRow(id, uri, thumbUri, birthday, name);
+        return new BirthdayContact(id, uri, thumbUri, birthday, name);
     }
 
     static protected BirthdayCursorLoader createCursorLoader(Context context) {

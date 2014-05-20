@@ -29,14 +29,14 @@ import java.util.Set;
 /**
  * Created by joey.tsai on 5/12/2014.
  */
-public class ContactListAdapter extends CursorAdapter {
-    private static final String TAG = "ContactListAdapter";
+public class BirthdayListAdapter extends CursorAdapter {
+    private static final String TAG = "BirthdayListAdapter";
 
     private final LayoutInflater mInflater;
     private final ContentResolver mResolver;
     private final ContactPhotoCache mPhotoCache;
 
-    public ContactListAdapter(Context context) {
+    public BirthdayListAdapter(Context context) {
         super(context, null, 0);
         mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mResolver = context.getContentResolver();
@@ -46,7 +46,7 @@ public class ContactListAdapter extends CursorAdapter {
     @Override
     public long getItemId(int position) {
         final BirthdayCursor cursor = (BirthdayCursor) getCursor();
-        return cursor.getBirthdayListRow(position).mId;
+        return cursor.getBirthdayContact(position).mId;
     }
 
     @Override
@@ -59,7 +59,7 @@ public class ContactListAdapter extends CursorAdapter {
         }
 
         final BirthdayCursor cursor = (BirthdayCursor) getCursor();
-        final BirthdayListRow row = cursor.getBirthdayListRow(position);
+        final BirthdayContact row = cursor.getBirthdayContact(position);
         bindView(v, row);
         return v;
     }
@@ -67,7 +67,7 @@ public class ContactListAdapter extends CursorAdapter {
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
         final View view = mInflater.inflate(R.layout.contact_row, parent, false);
-        ContactRow row = new ContactRow();
+        ViewHolder row = new ViewHolder();
         row.qcBadge = (QuickContactBadge) view.findViewById(R.id.quickbadge);
         row.tvName = (TextView) view.findViewById(R.id.textViewName);
         row.tvDays = (TextView) view.findViewById(R.id.textViewDays);
@@ -82,16 +82,16 @@ public class ContactListAdapter extends CursorAdapter {
         throw new IllegalStateException("getView doesn't call this anymore.");
     }
 
-    public void bindView(final View view, BirthdayListRow birthdayRow) {
-        ContactRow row = (ContactRow) view.getTag();
+    public void bindView(final View view, BirthdayContact birthdayRow) {
+        ViewHolder hodor = (ViewHolder) view.getTag();
 
+        final ContactBirthday contactBirthday = birthdayRow.mBirthday;
         final String formattedBirthday = DateUtils.formatDateTime(null,
-                birthdayRow.mBirthday.mNextBirthday, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
-        final String daysAway = birthdayRow.mBirthday.mDaysAway + "d";
+                contactBirthday.mNextBirthday, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
+        final String daysAway = contactBirthday.mDaysAway + "d";
+        String contactAge = contactBirthday.getNextBirthdayAgeFormatted();
 
-        String contactAge = birthdayRow.mBirthday.getNextBirthdayAgeFormatted();
-
-        QuickContactBadge badge = row.qcBadge;
+        QuickContactBadge badge = hodor.qcBadge;
         badge.assignContactUri(birthdayRow.mUri);
         String thumbUri = birthdayRow.mThumbUri;
         Bitmap bitmap = null;
@@ -110,13 +110,13 @@ public class ContactListAdapter extends CursorAdapter {
             badge.setImageBitmap(bitmap);
         }
 
-        row.tvName.setText(birthdayRow.mName);
-        row.tvDays.setText(daysAway);
-        row.tvDate.setText(formattedBirthday);
-        row.tvAge.setText(contactAge);
+        hodor.tvName.setText(birthdayRow.mName);
+        hodor.tvDays.setText(daysAway);
+        hodor.tvDate.setText(formattedBirthday);
+        hodor.tvAge.setText(contactAge);
     }
 
-    private static class ContactRow {
+    static private class ViewHolder {
         QuickContactBadge qcBadge;
         TextView tvName;
         TextView tvDays;
@@ -124,7 +124,7 @@ public class ContactListAdapter extends CursorAdapter {
         TextView tvAge;
     }
 
-    private static Bitmap loadContactPhotoThumbnail(ContentResolver resolver, String photoData) {
+    static private Bitmap loadContactPhotoThumbnail(ContentResolver resolver, String photoData) {
         if (photoData == null) {
             return null;
         }
@@ -151,7 +151,7 @@ public class ContactListAdapter extends CursorAdapter {
         return null;
     }
 
-    private static class ContactPhotoCache {
+    static private class ContactPhotoCache {
         private final LruCache<String, Bitmap> mCache;
         private final Set<String> mHasNoContactPhoto;
 
@@ -197,7 +197,7 @@ public class ContactListAdapter extends CursorAdapter {
         }
     }
 
-    private static class ContactPhotoTask extends AsyncTask<String, Void, Bitmap> {
+    static private class ContactPhotoTask extends AsyncTask<String, Void, Bitmap> {
         private final WeakReference<ImageView> mImageViewReference;
         private final ContactPhotoCache mCache;
         private final ContentResolver mResolver;

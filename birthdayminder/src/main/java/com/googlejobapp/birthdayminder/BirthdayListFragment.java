@@ -10,19 +10,18 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.CursorAdapter;
 
-public class ContactListFragment extends ListFragment implements
+public class BirthdayListFragment extends ListFragment implements
 		LoaderManager.LoaderCallbacks<Cursor>, AdapterView.OnItemClickListener {
 
-	private static final String TAG = "ContactListFragment";
+	private static final String TAG = "BirthdayListFragment";
 
-
-	private ContactListAdapter mAdapter;
+	private BirthdayListAdapter mAdapter;
 
 	@Override
 	public void onActivityCreated(final Bundle savedInstanceState) {
 		super.onActivityCreated(savedInstanceState);
 
-		mAdapter = new ContactListAdapter(getActivity());
+		mAdapter = new BirthdayListAdapter(getActivity());
 		setListAdapter(mAdapter);
 
 		getListView().setOnItemClickListener(this);
