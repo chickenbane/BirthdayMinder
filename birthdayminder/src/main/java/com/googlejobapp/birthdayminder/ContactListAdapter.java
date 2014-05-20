@@ -2,13 +2,11 @@ package com.googlejobapp.birthdayminder;
 
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.CursorLoader;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.provider.ContactsContract;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.LruCache;
@@ -48,20 +46,23 @@ public class ContactListAdapter extends CursorAdapter {
     @Override
     public long getItemId(int position) {
         final BirthdayCursor cursor = (BirthdayCursor) getCursor();
-        return cursor.getBirthdayListRow(position).getId();
+        return cursor.getBirthdayListRow(position).mId;
     }
 
-//    @Override
-//    public View getView(int position, View convertView, ViewGroup parent) {
-//        View v;
-//        if (convertView == null) {
-//            v = newView(mContext, mCursor, parent);
-//        } else {
-//            v = convertView;
-//        }
-//        bindView(v, mContext, mCursor);
-//        return v;
-//    }
+    @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        View v;
+        if (convertView == null) {
+            v = newView(null, null, parent);
+        } else {
+            v = convertView;
+        }
+
+        final BirthdayCursor cursor = (BirthdayCursor) getCursor();
+        final BirthdayListRow row = cursor.getBirthdayListRow(position);
+        bindView(v, row);
+        return v;
+    }
 
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
@@ -77,22 +78,22 @@ public class ContactListAdapter extends CursorAdapter {
     }
 
     @Override
-    public void bindView(final View view, final Context context,
-                         final Cursor cursor) {
+    public void bindView(View view, Context context, Cursor cursor) {
+        throw new IllegalStateException("getView doesn't call this anymore.");
+    }
+
+    public void bindView(final View view, BirthdayListRow birthdayRow) {
         ContactRow row = (ContactRow) view.getTag();
 
-        BirthdayCursor birthdayCursor = (BirthdayCursor) cursor;
-        BirthdayListRow birthdayRow = birthdayCursor.getBirthdayListRow(cursor.getPosition());
-
         final String formattedBirthday = DateUtils.formatDateTime(null,
-                birthdayRow.getBirthday().getNextBirthday(), DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
-        final String daysAway = birthdayRow.getBirthday().getDaysAway() + "d";
+                birthdayRow.mBirthday.mNextBirthday, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH);
+        final String daysAway = birthdayRow.mBirthday.mDaysAway + "d";
 
-        String contactAge = birthdayRow.getBirthday().getNextBirthdayAgeFormatted();
+        String contactAge = birthdayRow.mBirthday.getNextBirthdayAgeFormatted();
 
         QuickContactBadge badge = row.qcBadge;
-        badge.assignContactUri(birthdayRow.getUri());
-        String thumbUri = birthdayRow.getThumbUri();
+        badge.assignContactUri(birthdayRow.mUri);
+        String thumbUri = birthdayRow.mThumbUri;
         Bitmap bitmap = null;
 
         if (mPhotoCache.fetchContactPhoto(thumbUri)) {
@@ -109,7 +110,7 @@ public class ContactListAdapter extends CursorAdapter {
             badge.setImageBitmap(bitmap);
         }
 
-        row.tvName.setText(birthdayRow.getName());
+        row.tvName.setText(birthdayRow.mName);
         row.tvDays.setText(daysAway);
         row.tvDate.setText(formattedBirthday);
         row.tvAge.setText(contactAge);

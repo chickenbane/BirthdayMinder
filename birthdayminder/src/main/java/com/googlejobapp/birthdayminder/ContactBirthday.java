@@ -27,8 +27,8 @@ public class ContactBirthday {
 	private final boolean mHasYear;
 	private final Date mBirthDate;
 
-    private final long mNextBirthday;
-    private final int mDaysAway;
+    protected final long mNextBirthday;
+    protected final int mDaysAway;
 
 	public static ContactBirthday createContactBirthday(final String contactDate) {
 		if (contactDate == null) {
@@ -57,14 +57,6 @@ public class ContactBirthday {
 
         mNextBirthday = calcNextBirthday(birthDate);
         mDaysAway = calcDaysAway(mNextBirthday);
-    }
-
-    public long getNextBirthday() {
-        return mNextBirthday;
-    }
-
-    public int getDaysAway() {
-        return mDaysAway;
     }
 
     static private long calcNextBirthday(Date birthDate) {

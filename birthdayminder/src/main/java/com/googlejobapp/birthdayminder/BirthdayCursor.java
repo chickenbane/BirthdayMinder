@@ -5,6 +5,7 @@ import android.database.CursorWrapper;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -22,6 +23,8 @@ public class BirthdayCursor extends CursorWrapper {
         while (cursor.moveToNext()) {
             mRows.add(BirthdayDao.createBirthdayListRow(cursor));
         }
+
+        Collections.sort(mRows);
     }
 
     public BirthdayListRow getBirthdayListRow(int position) {

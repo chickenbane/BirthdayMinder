@@ -5,12 +5,12 @@ import android.net.Uri;
 /**
  * Created by joey.tsai on 5/19/2014.
  */
-public class BirthdayListRow {
-    private final long mId;
-    private final Uri mUri;
-    private final String mThumbUri;
-    private final ContactBirthday mBirthday;
-    private final String mName;
+public class BirthdayListRow implements Comparable<BirthdayListRow> {
+    protected final long mId;
+    protected final Uri mUri;
+    protected final String mThumbUri;
+    protected final ContactBirthday mBirthday;
+    protected final String mName;
 
     public BirthdayListRow(long id, Uri uri, String thumbUri, ContactBirthday birthday, String name) {
         mId = id;
@@ -20,23 +20,15 @@ public class BirthdayListRow {
         mName = name;
     }
 
-    public long getId() {
-        return mId;
-    }
-
-    public Uri getUri() {
-        return mUri;
-    }
-
-    public String getThumbUri() {
-        return mThumbUri;
-    }
-
-    public ContactBirthday getBirthday() {
-        return mBirthday;
-    }
-
-    public String getName() {
-        return mName;
+    @Override
+    public int compareTo(BirthdayListRow another) {
+        int me = mBirthday.mDaysAway;
+        int her = another.mBirthday.mDaysAway;
+        if (me < her) {
+            return -1;
+        } else if (me > her) {
+            return 1;
+        }
+        return 0;
     }
 }
